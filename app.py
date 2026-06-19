@@ -6,6 +6,32 @@ from reportlab.lib.styles import getSampleStyleSheet
 from docx import Document
 from datetime import datetime
 import os
+from io import BytesIO
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER
+from io import BytesIO
+from datetime import datetime
+import os
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.styles import ParagraphStyle
+
+pdfmetrics.registerFont(
+    TTFont(
+        'Bengali',
+        'fonts/NotoSansBengali-Regular.ttf'
+    )
+)
+
+pdfmetrics.registerFont(
+    TTFont(
+        'Bengali2',
+        'fonts/solaimanlipi_22-02-2012.ttf'
+    )
+)
 
 # ----------------------------
 # SESSION STATE
@@ -22,10 +48,23 @@ st.title("📘 Question Paper Generator (Mobile Ready)")
 # ----------------------------
 # UPLOAD EXCEL
 # ----------------------------
-uploaded_file = st.file_uploader("Upload Excel Question Bank", type=["xlsx", "xls"])
+FOLDER = "question_bank"
+
+files = [f for f in os.listdir(FOLDER) if f.endswith((".xlsx", ".xls"))]
+
+selected_file = st.selectbox("📂 Select Question Bank File", files)
+
+uploaded_file = None
+file_path = None
+
+if selected_file:
+    file_path = os.path.join(FOLDER, selected_file)
+    uploaded_file = file_path
+
+    st.success(f"Selected: {selected_file}")
 
 if uploaded_file:
-    xls = pd.ExcelFile(uploaded_file)
+    xls = pd.ExcelFile(file_path)
     sheets = xls.sheet_names
 
     st.subheader("Select Topics")
@@ -41,6 +80,54 @@ if uploaded_file:
             step=1
         )
 
+
+    def create_pdf(header, text):
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer)
+
+        styles = getSampleStyleSheet()
+
+        bengali_style = ParagraphStyle(
+            "BengaliStyle",
+            parent=styles["Normal"],
+            fontName="Bengali2",
+            fontSize=11,
+            leading=16
+        )
+
+        # 🎯 Custom header style
+        header_style = ParagraphStyle(
+            name="Header",
+            fontSize=16,
+            alignment=TA_CENTER,
+            spaceAfter=12,
+            leading=20
+        )
+
+        story = []
+
+        # ---------------- HEADER ----------------
+        story.append(Paragraph(header, header_style))
+        story.append(Spacer(1, 10))
+
+        subject = os.path.splitext(selected_file)[0]
+        story.insert(1, Paragraph(f"Subject: {subject}", styles["Normal"]))
+
+        today = datetime.now().strftime("%d-%m-%Y")
+        story.insert(2, Paragraph(f"Date: {today}", styles["Normal"]))
+
+        # ---------------- CONTENT ----------------
+        for line in text.split("\n"):
+            if line.strip():
+                story.append(Paragraph(line, bengali_style))
+                story.append(Spacer(1, 6))
+            else:
+                story.append(Spacer(1, 10))
+
+        doc.build(story)
+        buffer.seek(0)
+        return buffer
+
     # ----------------------------
     # GENERATE PAPER
     # ----------------------------
@@ -49,9 +136,10 @@ if uploaded_file:
         qa_data = {}
         qa_text = ""
         ans_text = ""
+        qa_ans_text = ""
 
         for sheet in selected_sheets:
-            df = pd.read_excel(uploaded_file, sheet_name=sheet).dropna()
+            df = pd.read_excel(file_path, sheet_name=sheet).dropna()
 
             qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
 
@@ -62,14 +150,17 @@ if uploaded_file:
 
             qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
             ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+            qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
 
             for i, (q, a) in enumerate(selected, 1):
                 qa_text += f"{i}. {q}\n"
                 ans_text += f"{i}. {a}\n"
+                qa_ans_text += f"{i}. {q} || {a}\n"
 
         st.session_state.generated = qa_data
         st.session_state.qa_text = qa_text
         st.session_state.ans_text = ans_text
+        st.session_state.qa_ans_text = qa_ans_text
 
         st.success("Paper Generated!")
 
@@ -83,7 +174,7 @@ if uploaded_file:
         manual_data = {}
 
         for sheet in selected_sheets:
-            df = pd.read_excel(uploaded_file, sheet_name=sheet).dropna()
+            df = pd.read_excel(file_path, sheet_name=sheet).dropna()
             qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
 
             options = [f"{q} || {a}" for q, a in qa_pairs]
@@ -100,17 +191,21 @@ if uploaded_file:
 
             qa_text = ""
             ans_text = ""
+            qa_ans_text = ""
 
             for sheet, items in manual_data.items():
                 qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
                 ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+                qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
 
                 for i, (q, a) in enumerate(items, 1):
                     qa_text += f"{i}. {q}\n"
                     ans_text += f"{i}. {a}\n"
+                    qa_ans_text += f"{i}. {q} || {a}\n"
 
             st.session_state.qa_text = qa_text
             st.session_state.ans_text = ans_text
+            st.session_state.qa_ans_text = qa_ans_text
 
             st.success("Manual selection applied!")
 
@@ -131,52 +226,25 @@ if uploaded_file:
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # ----------------------------
-    # SAVE PDF
-    # ----------------------------
-    if st.button("Download PDF (Q + A)"):
 
-        file_path = os.path.join(SAVE_FOLDER, f"paper_{timestamp}.pdf")
+    # CREATE PDF FROM SESSION STATE
+    pdf_buffer_qa = create_pdf("QUESTION PAPER", st.session_state.qa_text)
+    pdf_buffer_ans = create_pdf("ANSWER SHEET", st.session_state.ans_text)
+    pdf_buffer_qa_ans = create_pdf("ANSWER SHEET", st.session_state.qa_ans_text)
 
-        doc = SimpleDocTemplate(file_path)
-        styles = getSampleStyleSheet()
-        story = []
+    st.download_button(
+        label="📤 Download Questions",
+        data=pdf_buffer_qa,
+        file_name="question_paper.pdf",
+        mime="application/pdf"
+    )
+  
+    
+    st.download_button(
+        label="📤 Download Questions & Answers",
+        data=pdf_buffer_qa_ans,
+        file_name="answer_paper.pdf",
+        mime="application/pdf"
+    )
 
-        for line in st.session_state.qa_text.split("\n"):
-            story.append(Paragraph(line, styles["Normal"]))
 
-        story.append(PageBreak())
-
-        for line in st.session_state.ans_text.split("\n"):
-            story.append(Paragraph(line, styles["Normal"]))
-
-        doc.build(story)
-
-        st.success("PDF saved!")
-        with open(file_path, "rb") as f:
-            st.download_button("Download PDF", f, file_name="question_paper.pdf")
-
-    # ----------------------------
-    # SAVE WORD
-    # ----------------------------
-    if st.button("Download Word"):
-
-        file_path = os.path.join(SAVE_FOLDER, f"paper_{timestamp}.docx")
-
-        doc = Document()
-
-        doc.add_heading("QUESTION PAPER", 0)
-        for line in st.session_state.qa_text.split("\n"):
-            doc.add_paragraph(line)
-
-        doc.add_page_break()
-
-        doc.add_heading("ANSWER KEY", 0)
-        for line in st.session_state.ans_text.split("\n"):
-            doc.add_paragraph(line)
-
-        doc.save(file_path)
-
-        st.success("Word file saved!")
-        with open(file_path, "rb") as f:
-            st.download_button("Download Word", f, file_name="question_paper.docx")
