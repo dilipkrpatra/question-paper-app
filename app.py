@@ -42,8 +42,10 @@ if "qa_text" not in st.session_state:
     st.session_state.qa_text = ""
 if "ans_text" not in st.session_state:
     st.session_state.ans_text = ""
+if "qa_ans_text" not in st.session_state:
+    st.session_state.qa_ans_text = ""
 
-st.title("📘 Question Paper Generator (Mobile Ready)")
+st.title("📘 Test Paper Generator")
 
 # ----------------------------
 # UPLOAD EXCEL
@@ -52,7 +54,7 @@ FOLDER = "question_bank"
 
 files = [f for f in os.listdir(FOLDER) if f.endswith((".xlsx", ".xls"))]
 
-selected_file = st.selectbox("📂 Select Question Bank File", files)
+selected_file = st.selectbox("📂 Select Subject", files)
 
 uploaded_file = None
 file_path = None
@@ -69,7 +71,14 @@ if uploaded_file:
 
     st.subheader("Select Topics")
 
-    selected_sheets = st.multiselect("Choose Sheets", sheets)
+    # Dropdown List
+    #selected_sheets = st.multiselect("Choose Sheets", sheets)
+    
+    selected_sheets = st.pills(
+        "Select Topics",
+        sheets,
+        selection_mode="multi"
+    )
 
     topic_counts = {}
     for sheet in selected_sheets:
@@ -128,11 +137,29 @@ if uploaded_file:
         buffer.seek(0)
         return buffer
 
+    st.markdown("""
+    <style>
+    div.stButton > button:first-child {
+        background: linear-gradient(90deg,#1e3c72,#2a5298);
+        color:white;
+        font-size:22px;
+        font-weight:bold;
+        border-radius:15px;
+        height:60px;
+        border:none;
+        box-shadow:0 4px 10px rgba(0,0,0,0.25);
+    }
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(90deg,#2a5298,#1e3c72);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    if st.button("🚀 GENERATE QUESTION PAPER", use_container_width=True):
+        ...
     # ----------------------------
     # GENERATE PAPER
     # ----------------------------
-    if st.button("Generate Test Paper"):
-
         qa_data = {}
         qa_text = ""
         ans_text = ""
@@ -213,10 +240,20 @@ if uploaded_file:
     # PREVIEW
     # ----------------------------
     st.subheader("Question Paper")
-    st.text_area("Questions", st.session_state.qa_text, height=300)
+#    st.text_area("Questions", st.session_state.qa_text, height=300)
+
+    st.code(
+        st.session_state.qa_text,
+        language="text"
+    )
 
     st.subheader("Answer Key")
-    st.text_area("Answers", st.session_state.ans_text, height=300)
+    #st.text_area("Answers", st.session_state.ans_text, height=300)
+
+    st.code(
+        st.session_state.ans_text,
+        language="text"
+    )
 
     # ----------------------------
     # SAVE FOLDER
@@ -246,5 +283,7 @@ if uploaded_file:
         file_name="answer_paper.pdf",
         mime="application/pdf"
     )
+
+
 
 
