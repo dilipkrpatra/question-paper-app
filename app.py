@@ -19,6 +19,8 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.styles import ParagraphStyle
 
+st.write(st.__version__)
+
 pdfmetrics.registerFont(
     TTFont(
         'Bengali',
@@ -139,6 +141,7 @@ if uploaded_file:
 
     st.markdown("""
     <style>
+    
     div.stButton > button:first-child {
         background: linear-gradient(90deg,#1e3c72,#2a5298);
         color:white;
@@ -152,89 +155,110 @@ if uploaded_file:
     div.stButton > button:first-child:hover {
         background: linear-gradient(90deg,#2a5298,#1e3c72);
     }
+    
+   
     </style>
     """, unsafe_allow_html=True)
 
-    if st.button("🚀 GENERATE QUESTION PAPER", use_container_width=True):
-        ...
-    # ----------------------------
-    # GENERATE PAPER
-    # ----------------------------
-        qa_data = {}
-        qa_text = ""
-        ans_text = ""
-        qa_ans_text = ""
 
-        for sheet in selected_sheets:
-            df = pd.read_excel(file_path, sheet_name=sheet).dropna()
+    if selected_sheets:
 
-            qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
+        col1, col2 = st.columns(2)
 
-            count = min(topic_counts[sheet], len(qa_pairs))
-            selected = random.sample(qa_pairs, count)
+        with col1:
+            auto_generate = st.button(
+                "⚡ GENERATE QUESTIONS (AUTO)",
+                use_container_width=True
+            )
 
-            qa_data[sheet] = selected
+        with col2:
+            manual_select = st.button(
+                "✏  MANUAL SELECTION..",
+                use_container_width=True
+            )
 
-            qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-            ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-            qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-
-            for i, (q, a) in enumerate(selected, 1):
-                qa_text += f"{i}. {q}\n"
-                ans_text += f"{i}. {a}\n"
-                qa_ans_text += f"{i}. {q} || {a}\n"
-
-        st.session_state.generated = qa_data
-        st.session_state.qa_text = qa_text
-        st.session_state.ans_text = ans_text
-        st.session_state.qa_ans_text = qa_ans_text
-
-        st.success("Paper Generated!")
-
-    # ----------------------------
-    # MANUAL SELECTION
-    # ----------------------------
-    if st.session_state.generated:
-
-        st.subheader("Manual Selection (Optional)")
-
-        manual_data = {}
-
-        for sheet in selected_sheets:
-            df = pd.read_excel(file_path, sheet_name=sheet).dropna()
-            qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
-
-            options = [f"{q} || {a}" for q, a in qa_pairs]
-
-            selected = st.multiselect(f"{sheet}", options)
-
-            if selected:
-                manual_data[sheet] = [
-                    tuple(item.split(" || ")) for item in selected
-                ]
-
-        if st.button("Apply Manual Selection"):
-            st.session_state.generated = manual_data
-
+        if auto_generate:
+        # ----------------------------
+        # GENERATE PAPER
+        # ----------------------------
+            qa_data = {}
             qa_text = ""
             ans_text = ""
             qa_ans_text = ""
 
-            for sheet, items in manual_data.items():
+            for sheet in selected_sheets:
+                df = pd.read_excel(file_path, sheet_name=sheet).dropna()
+
+                qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
+
+                count = min(topic_counts[sheet], len(qa_pairs))
+                selected = random.sample(qa_pairs, count)
+
+                qa_data[sheet] = selected
+
                 qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
                 ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
                 qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
 
-                for i, (q, a) in enumerate(items, 1):
+                for i, (q, a) in enumerate(selected, 1):
                     qa_text += f"{i}. {q}\n"
                     ans_text += f"{i}. {a}\n"
                     qa_ans_text += f"{i}. {q} || {a}\n"
 
+            st.session_state.generated = qa_data
             st.session_state.qa_text = qa_text
             st.session_state.ans_text = ans_text
             st.session_state.qa_ans_text = qa_ans_text
 
-            st.success("Manual selection applied!")
+            st.success("Paper Generated!")
+
+        if manual_select:
+            st.session_state.manual_mode = True
+
+        # ----------------------------
+        # MANUAL SELECTION
+        # ----------------------------
+        if st.session_state.get("manual_mode", False):
+
+            st.subheader("Manual Question Selection")
+
+            manual_data = {}
+
+            for sheet in selected_sheets:
+                df = pd.read_excel(file_path, sheet_name=sheet).dropna()
+                qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
+
+                options = [f"{q} || {a}" for q, a in qa_pairs]
+
+                selected = st.multiselect(f"{sheet}", options)
+
+                if selected:
+                    manual_data[sheet] = [
+                        tuple(item.split(" || ")) for item in selected
+                    ]
+
+            if st.button("Apply Manual Selection"):
+                st.session_state.generated = manual_data
+
+                qa_text = ""
+                ans_text = ""
+                qa_ans_text = ""
+
+                for sheet, items in manual_data.items():
+                    qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+                    ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+                    qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+
+                    for i, (q, a) in enumerate(items, 1):
+                        qa_text += f"{i}. {q}\n"
+                        ans_text += f"{i}. {a}\n"
+                        qa_ans_text += f"{i}. {q} || {a}\n"
+
+                st.session_state.qa_text = qa_text
+                st.session_state.ans_text = ans_text
+                st.session_state.qa_ans_text = qa_ans_text
+
+                st.success("Manual selection applied!")
 
     # ----------------------------
     # PREVIEW
@@ -283,6 +307,7 @@ if uploaded_file:
         file_name="answer_paper.pdf",
         mime="application/pdf"
     )
+
 
 
 
