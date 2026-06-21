@@ -19,7 +19,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.styles import ParagraphStyle
 
-st.write(st.__version__)
+# st.write(st.__version__)
 
 pdfmetrics.registerFont(
     TTFont(
@@ -34,6 +34,27 @@ pdfmetrics.registerFont(
         'fonts/solaimanlipi_22-02-2012.ttf'
     )
 )
+
+
+# ----------------------------
+# PAGE CONTROL
+# ----------------------------
+if "page" not in st.session_state:
+    st.session_state.page = "generator"
+
+if "generated" not in st.session_state:
+    st.session_state.generated = {}
+
+if "student_answers" not in st.session_state:
+    st.session_state.student_answers = {}
+
+if "score" not in st.session_state:
+    st.session_state.score = 0
+
+if "total_questions" not in st.session_state:
+    st.session_state.total_questions = 0
+
+
 
 # ----------------------------
 # SESSION STATE
@@ -270,14 +291,35 @@ if uploaded_file:
         st.session_state.qa_text,
         language="text"
     )
+    
+    if st.session_state.generated:
 
-    st.subheader("Answer Key")
-    #st.text_area("Answers", st.session_state.ans_text, height=300)
+        st.success("Question Paper Ready")
 
-    st.code(
-        st.session_state.ans_text,
-        language="text"
+        if st.button(
+            "📝 START TEST",
+            use_container_width=True
+        ):
+            st.session_state.page = "test"
+            st.rerun()
+    
+    
+
+    # ----------------------------
+    # ANSWER KEY TOGGLE
+    # ----------------------------
+    show_answers = st.toggle(
+        "👁 Show Answers",
+        value=False
     )
+
+    if show_answers:
+        st.subheader("Answer Key")
+
+        st.code(
+            st.session_state.ans_text,
+            language="text"
+        )
 
     # ----------------------------
     # SAVE FOLDER
@@ -309,6 +351,156 @@ if uploaded_file:
     )
 
 
+    # ====================================
+    # TEST PAGE
+    # ====================================
+    if st.session_state.page == "test":
+
+        st.title("📝 Practice Test")
+
+        q_no = 1
+
+        for sheet, questions in st.session_state.generated.items():
+
+            st.subheader(f"📚 {sheet}")
+
+            for idx, (question, answer) in enumerate(questions):
+
+                st.markdown(f"### Q{q_no}. {question}")
+
+                st.text_area(
+                    "Write your answer here",
+                    key=f"answer_{sheet}_{idx}",
+                    height=120
+                )
+
+                st.divider()
+
+                q_no += 1
+
+        st.write("---")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button(
+                "⬅ Back to Generator",
+                use_container_width=True
+            ):
+                st.session_state.page = "generator"
+                st.rerun()
+
+        with col2:
+            if st.button(
+                "✅ Submit Test",
+                use_container_width=True
+            ):
+                st.session_state.page = "result"
+                st.rerun()
+
+        st.stop()
+
+
+    # ====================================
+    # RESULT PAGE
+    # ====================================
+    if st.session_state.page == "result":
+
+        st.title("🏆 Test Result")
+
+        from difflib import SequenceMatcher
+
+        score = 0
+        total = 0
+
+        result_rows = []
+
+        for sheet, questions in st.session_state.generated.items():
+
+            for idx, (question, correct_answer) in enumerate(questions):
+
+                total += 1
+
+                student_answer = st.session_state.get(
+                    f"answer_{sheet}_{idx}",
+                    ""
+                )
+
+                similarity = SequenceMatcher(
+                    None,
+                    student_answer.lower().strip(),
+                    correct_answer.lower().strip()
+                ).ratio()
+
+                correct = similarity >= 0.70
+
+                if correct:
+                    score += 1
+
+                result_rows.append(
+                    {
+                        "Question": question,
+                        "Your Answer": student_answer,
+                        "Correct Answer": correct_answer,
+                        "Result": "✅ Correct" if correct else "❌ Wrong"
+                    }
+                )
+
+        percentage = 0
+
+        if total > 0:
+            percentage = round((score / total) * 100, 2)
+
+        st.metric(
+            "Score",
+            f"{score}/{total}"
+        )
+
+        st.metric(
+            "Percentage",
+            f"{percentage}%"
+        )
+
+        if percentage >= 80:
+            st.success("Excellent")
+        elif percentage >= 60:
+            st.info("Good")
+        else:
+            st.warning("Needs Improvement")
+
+        df = pd.DataFrame(result_rows)
+
+        st.dataframe(
+            df,
+            use_container_width=True
+        )
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+
+            if st.button(
+                "🔄 Retake Test",
+                use_container_width=True
+            ):
+                st.session_state.page = "test"
+                st.rerun()
+
+        with col2:
+
+            if st.button(
+                "🏠 Home",
+                use_container_width=True
+            ):
+                st.session_state.page = "generator"
+
+                for k in list(st.session_state.keys()):
+                    if k.startswith("answer_"):
+                        del st.session_state[k]
+
+                st.rerun()
+
+        st.stop()
 
 
 
