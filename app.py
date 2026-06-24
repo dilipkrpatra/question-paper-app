@@ -97,11 +97,21 @@ if uploaded_file:
     # Dropdown List
     #selected_sheets = st.multiselect("Choose Sheets", sheets)
     
-    selected_sheets = st.pills(
+    # Create topic names with counts
+    sheet_display = {}
+
+    for sheet in sheets:
+        df = pd.read_excel(file_path, sheet_name=sheet).dropna()
+        count = len(df)
+        sheet_display[f"{sheet} ({count})"] = sheet
+
+    selected_display = st.pills(
         "Select Topics",
-        sheets,
+        list(sheet_display.keys()),
         selection_mode="multi"
     )
+
+    selected_sheets = [sheet_display[x] for x in selected_display]
 
     topic_counts = {}
     for sheet in selected_sheets:
@@ -217,7 +227,13 @@ if uploaded_file:
 
                 qa_data[sheet] = selected
 
-                qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
+                heading = str(pd.read_excel(
+                    file_path,
+                    sheet_name=sheet,
+                    header=None
+                ).iloc[0, 0])
+
+                qa_text += f"\n{heading}\n" + "-" * 40 + "\n"
                 ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
                 qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
 
@@ -501,6 +517,7 @@ if uploaded_file:
                 st.rerun()
 
         st.stop()
+
 
 
 
