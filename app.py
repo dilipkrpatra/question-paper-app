@@ -240,7 +240,7 @@ if uploaded_file:
                 for i, (q, a) in enumerate(selected, 1):
                     qa_text += f"{i}. {q}\n"
                     ans_text += f"{i}. {a}\n"
-                    qa_ans_text += f"{i}. {q} || {a}\n"
+                    qa_ans_text += f"{i}. {q} ⮫ {a}\n"
 
             st.session_state.generated = qa_data
             st.session_state.qa_text = qa_text
@@ -289,7 +289,7 @@ if uploaded_file:
                     for i, (q, a) in enumerate(items, 1):
                         qa_text += f"{i}. {q}\n"
                         ans_text += f"{i}. {a}\n"
-                        qa_ans_text += f"{i}. {q} || {a}\n"
+                        qa_ans_text += f"{i}. {q} ⮫ {a}\n"
 
                 st.session_state.qa_text = qa_text
                 st.session_state.ans_text = ans_text
@@ -333,7 +333,7 @@ if uploaded_file:
         st.subheader("Answer Key")
 
         st.code(
-            st.session_state.ans_text,
+            st.session_state.qa_ans_text,
             language="text"
         )
 
