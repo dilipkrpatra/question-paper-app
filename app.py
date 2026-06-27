@@ -1,523 +1,466 @@
-import streamlit as st
-import pandas as pd
+import os
 import random
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
+from datetime import datetime
+
+import pandas as pd
+import streamlit as st
+
+import streamlit.components.v1 as components
+
 from docx import Document
-from datetime import datetime
-import os
-from io import BytesIO
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer
+)
+
+from reportlab.lib.styles import (
+    getSampleStyleSheet,
+    ParagraphStyle
+)
+
 from reportlab.lib.enums import TA_CENTER
-from io import BytesIO
-from datetime import datetime
-import os
+
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.lib.styles import ParagraphStyle
 
-# st.write(st.__version__)
+
+# ---------------------------------------------------
+# PAGE CONFIG
+# ---------------------------------------------------
+
+st.set_page_config(
+    page_title="Question Paper Generator",
+    page_icon="📘",
+    layout="wide"
+)
+
+# ---------------------------------------------------
+# FONTS
+# ---------------------------------------------------
 
 pdfmetrics.registerFont(
     TTFont(
-        'Bengali',
-        'fonts/NotoSansBengali-Regular.ttf'
+        "Bengali",
+        "fonts/NotoSansBengali-Regular.ttf"
     )
 )
 
 pdfmetrics.registerFont(
     TTFont(
-        'Bengali2',
-        'fonts/solaimanlipi_22-02-2012.ttf'
+        "Bengali2",
+        "fonts/solaimanlipi_22-02-2012.ttf"
     )
 )
 
 
-# ----------------------------
-# PAGE CONTROL
-# ----------------------------
-if "page" not in st.session_state:
-    st.session_state.page = "generator"
-
-if "generated" not in st.session_state:
-    st.session_state.generated = {}
-
-if "student_answers" not in st.session_state:
-    st.session_state.student_answers = {}
-
-if "score" not in st.session_state:
-    st.session_state.score = 0
-
-if "total_questions" not in st.session_state:
-    st.session_state.total_questions = 0
-
-
-
-# ----------------------------
+# ---------------------------------------------------
 # SESSION STATE
-# ----------------------------
-if "generated" not in st.session_state:
-    st.session_state.generated = {}
-if "qa_text" not in st.session_state:
-    st.session_state.qa_text = ""
-if "ans_text" not in st.session_state:
-    st.session_state.ans_text = ""
-if "qa_ans_text" not in st.session_state:
-    st.session_state.qa_ans_text = ""
+# ---------------------------------------------------
+
+defaults = {
+    "generated": {},
+    "qa_text": "",
+    "ans_text": "",
+    "qa_ans_text": ""
+}
+
+for key, value in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = value
+
+
+# ---------------------------------------------------
+# CACHE WORKBOOK
+# ---------------------------------------------------
+
+@st.cache_data(show_spinner=False)
+def load_question_bank(file_path):
+
+    workbook = pd.read_excel(
+        file_path,
+        sheet_name=None,
+        header=None,
+        engine="openpyxl"
+    )
+
+    bank = {}
+
+    for sheet, df in workbook.items():
+
+        heading = str(df.iloc[0, 0])
+
+        # ONLY take first 2 columns (ignore notes/extra columns safely)
+        df = df.iloc[1:, [0, 1]]
+
+        # Rename for safety
+        df.columns = ["question", "answer"]
+
+        # Drop rows where question or answer is missing ONLY in these 2 columns
+        df = df.dropna(subset=["question", "answer"])
+
+        qa_pairs = list(zip(
+            df["question"].astype(str),
+            df["answer"].astype(str)
+        ))
+
+        bank[sheet] = {
+            "heading": heading,
+            "questions": qa_pairs
+        }
+
+    return bank
+
+# ---------------------------------------------------
+# PDF CREATOR
+# ---------------------------------------------------
+
+def create_pdf(title, text, subject):
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer)
+    styles = getSampleStyleSheet()
+
+    header_style = ParagraphStyle(
+        "Header",
+        parent=styles["Heading1"],
+        alignment=TA_CENTER,
+        fontSize=18,
+        spaceAfter=12
+    )
+
+    bengali_style = ParagraphStyle(
+        "Bengali",
+        parent=styles["Normal"],
+        fontName="Bengali2",
+        fontSize=11,
+        leading=16
+    )
+
+    story = []
+
+    story.append(
+        Paragraph(title, header_style)
+    )
+
+    story.append(
+        Paragraph(
+            f"Subject : {subject}",
+            styles["Normal"]
+        )
+    )
+
+    story.append(
+        Paragraph(
+            f"Date : {datetime.now().strftime('%d-%m-%Y')}",
+            styles["Normal"]
+        )
+    )
+
+    story.append(
+        Spacer(1, 12)
+    )
+
+    for line in text.split("\n"):
+
+        if line.strip():
+            story.append(
+                Paragraph(
+                    line,
+                    bengali_style
+                )
+            )
+
+            story.append(
+                Spacer(1, 5)
+            )
+
+        else:
+            story.append(
+                Spacer(1, 10)
+            )
+
+    doc.build(story)
+    buffer.seek(0)
+
+    return buffer
+
+
+# ---------------------------------------------------
+# DOCX CREATOR
+# ---------------------------------------------------
+
+def create_docx(title, text):
+
+    doc = Document()
+    doc.add_heading(title, level=1)
+
+    for line in text.split("\n"):
+
+        doc.add_paragraph(line)
+
+    buffer = BytesIO()
+
+    doc.save(buffer)
+
+    buffer.seek(0)
+
+    return buffer
+
+
+# ---------------------------------------------------
+# BUILD QUESTION TEXT
+# ---------------------------------------------------
+
+def build_text(selected_questions, bank):
+
+    qa_text = ""
+
+    ans_text = ""
+
+    qa_ans_text = ""
+
+    for sheet, questions in selected_questions.items():
+
+        heading = bank[sheet]["heading"]
+        qa_text += f"\n{heading}\n"
+        qa_text += "-" * 40 + "\n"
+        ans_text += f"\n{heading}\n"
+        ans_text += "-" * 40 + "\n"
+        qa_ans_text += f"\n{heading}\n"
+        qa_ans_text += "-" * 40 + "\n"
+
+        for i, (q, a) in enumerate(
+            questions,
+            1
+        ):
+
+            qa_text += f"{i}. {q}\n"
+            ans_text += f"{i}. {a}\n"
+            qa_ans_text += f"{i}. {q}  ⮫  {a}\n"
+
+    return qa_text, ans_text, qa_ans_text
+
+# =====================================================
+# MAIN TITLE
+# =====================================================
 
 st.title("📘 Test Paper Generator")
 
-# ----------------------------
-# UPLOAD EXCEL
-# ----------------------------
-FOLDER = "question_bank"
 
-files = [f for f in os.listdir(FOLDER) if f.endswith((".xlsx", ".xls"))]
+# =====================================================
+# SUBJECT SELECTION
+# =====================================================
 
-selected_file = st.selectbox("📂 Select Subject", files)
+QUESTION_BANK_FOLDER = "question_bank"
 
-uploaded_file = None
-file_path = None
+files = sorted([
+    f for f in os.listdir(QUESTION_BANK_FOLDER)
+    if f.endswith((".xlsx", ".xls"))
+])
 
-if selected_file:
-    file_path = os.path.join(FOLDER, selected_file)
-    uploaded_file = file_path
+if not files:
+    st.error("No Excel files found in 'question_bank' folder.")
+    st.stop()
 
-    st.success(f"Selected: {selected_file}")
+selected_file = st.selectbox(
+    "📂 Select Subject",
+    files
+)
 
-if uploaded_file:
-    xls = pd.ExcelFile(file_path)
-    sheets = xls.sheet_names
+file_path = os.path.join(
+    QUESTION_BANK_FOLDER,
+    selected_file
+)
 
-    st.subheader("Select Topics")
+subject_name = os.path.splitext(selected_file)[0]
 
-    # Dropdown List
-    #selected_sheets = st.multiselect("Choose Sheets", sheets)
-    
-    # Create topic names with counts
-    sheet_display = {}
 
-    for sheet in sheets:
-        df = pd.read_excel(file_path, sheet_name=sheet).dropna()
-        count = len(df)
-        sheet_display[f"{sheet} ({count})"] = sheet
+# =====================================================
+# LOAD QUESTION BANK (ONLY ONCE)
+# =====================================================
 
-    selected_display = st.pills(
-        "Select Topics",
-        list(sheet_display.keys()),
-        selection_mode="multi"
+with st.spinner("Loading Question Bank..."):
+
+    bank = load_question_bank(file_path)
+
+
+sheet_names = list(bank.keys())
+
+
+# =====================================================
+# TOPIC SELECTION
+# =====================================================
+
+st.subheader("📚 Select Topics")
+
+topic_display = {}
+
+for sheet in sheet_names:
+
+    total = len(bank[sheet]["questions"])
+
+    topic_display[
+        f"{sheet} ({total})"
+    ] = sheet
+
+
+selected_display = st.pills(
+    "Choose Topics",
+    list(topic_display.keys()),
+    selection_mode="multi"
+)
+
+selected_topics = [
+    topic_display[item]
+    for item in selected_display
+]
+
+
+# =====================================================
+# QUESTION COUNT
+# =====================================================
+
+topic_counts = {}
+
+if selected_topics:
+
+    st.subheader("Number of Questions")
+
+    cols = st.columns(3)
+
+    for index, sheet in enumerate(selected_topics):
+
+        with cols[index % 3]:
+
+            maximum = len(bank[sheet]["questions"])
+
+            topic_counts[sheet] = st.number_input(
+
+                sheet,
+                min_value=1,
+                max_value=maximum,
+                value=min(5, maximum),
+                step=1,
+                key=f"count_{sheet}"
+            )
+
+
+# =====================================================
+# BUTTON CSS
+# =====================================================
+
+st.markdown("""
+
+<style>
+
+div.stButton > button:first-child{
+
+    background:linear-gradient(90deg,#1e3c72,#2a5298);
+    color:white;
+    font-size:22px;
+    font-weight:bold;
+    height:58px;
+    border:none;
+    border-radius:12px;
+
+}
+
+div.stButton > button:first-child:hover{
+
+    background:linear-gradient(90deg,#2a5298,#1e3c72);
+
+}
+
+</style>
+
+""", unsafe_allow_html=True)
+
+
+# =====================================================
+# GENERATE BUTTON
+# =====================================================
+
+if selected_topics:
+
+    generate = st.button(
+        "⚡ GENERATE QUESTION PAPER",
+        use_container_width=True
     )
 
-    selected_sheets = [sheet_display[x] for x in selected_display]
+else:
+    generate = False
 
-    topic_counts = {}
-    for sheet in selected_sheets:
-        topic_counts[sheet] = st.number_input(
-            f"Questions for {sheet}",
-            min_value=1,
-            value=5,
-            step=1
+# =====================================================
+# GENERATE RANDOM QUESTIONS
+# =====================================================
+
+if generate:
+
+    generated = {}
+    for sheet in selected_topics:
+        questions = bank[sheet]["questions"]
+        count = min(
+
+            topic_counts[sheet],
+            len(questions)
         )
 
-
-    def create_pdf(header, text):
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer)
-
-        styles = getSampleStyleSheet()
-
-        bengali_style = ParagraphStyle(
-            "BengaliStyle",
-            parent=styles["Normal"],
-            fontName="Bengali2",
-            fontSize=11,
-            leading=16
+        generated[sheet] = random.sample(
+            questions,
+            count
         )
 
-        # 🎯 Custom header style
-        header_style = ParagraphStyle(
-            name="Header",
-            fontSize=16,
-            alignment=TA_CENTER,
-            spaceAfter=12,
-            leading=20
-        )
+    st.session_state.generated = generated
 
-        story = []
+    qa_text, ans_text, qa_ans_text = build_text(
+        generated,
+        bank
+    )
 
-        # ---------------- HEADER ----------------
-        story.append(Paragraph(header, header_style))
-        story.append(Spacer(1, 10))
+    st.session_state.qa_text = qa_text
+    st.session_state.ans_text = ans_text
+    st.session_state.qa_ans_text = qa_ans_text
 
-        subject = os.path.splitext(selected_file)[0]
-        story.insert(1, Paragraph(f"Subject: {subject}", styles["Normal"]))
-
-        today = datetime.now().strftime("%d-%m-%Y")
-        story.insert(2, Paragraph(f"Date: {today}", styles["Normal"]))
-
-        # ---------------- CONTENT ----------------
-        for line in text.split("\n"):
-            if line.strip():
-                story.append(Paragraph(line, bengali_style))
-                story.append(Spacer(1, 6))
-            else:
-                story.append(Spacer(1, 10))
-
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-
-    st.markdown("""
-    <style>
+    st.success("✅ Question Paper Generated Successfully")
     
-    div.stButton > button:first-child {
-        background: linear-gradient(90deg,#1e3c72,#2a5298);
-        color:white;
-        font-size:22px;
-        font-weight:bold;
-        border-radius:15px;
-        height:60px;
-        border:none;
-        box-shadow:0 4px 10px rgba(0,0,0,0.25);
-    }
-    div.stButton > button:first-child:hover {
-        background: linear-gradient(90deg,#2a5298,#1e3c72);
-    }
-    
-   
-    </style>
-    """, unsafe_allow_html=True)
+# =====================================================
+# PREVIEW
+# =====================================================
 
+st.divider()
 
-    if selected_sheets:
+st.subheader("📄 Question Paper")
 
-        col1, col2 = st.columns(2)
+if st.session_state.qa_text == "":
 
-        with col1:
-            auto_generate = st.button(
-                "⚡ GENERATE QUESTIONS (AUTO)",
-                use_container_width=True
-            )
+    st.info("Generate a question paper to see the preview.")
 
-        with col2:
-            manual_select = st.button(
-                "✏  MANUAL SELECTION..",
-                use_container_width=True
-            )
-
-        if auto_generate:
-        # ----------------------------
-        # GENERATE PAPER
-        # ----------------------------
-            qa_data = {}
-            qa_text = ""
-            ans_text = ""
-            qa_ans_text = ""
-
-            for sheet in selected_sheets:
-                df = pd.read_excel(file_path, sheet_name=sheet).dropna()
-
-                qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
-
-                count = min(topic_counts[sheet], len(qa_pairs))
-                selected = random.sample(qa_pairs, count)
-
-                qa_data[sheet] = selected
-
-                heading = str(pd.read_excel(
-                    file_path,
-                    sheet_name=sheet,
-                    header=None
-                ).iloc[0, 0])
-
-                qa_text += f"\n{heading}\n" + "-" * 40 + "\n"
-                ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-                qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-
-                for i, (q, a) in enumerate(selected, 1):
-                    qa_text += f"{i}. {q}\n"
-                    ans_text += f"{i}. {a}\n"
-                    qa_ans_text += f"{i}. {q} ⮫ {a}\n"
-
-            st.session_state.generated = qa_data
-            st.session_state.qa_text = qa_text
-            st.session_state.ans_text = ans_text
-            st.session_state.qa_ans_text = qa_ans_text
-
-            st.success("Paper Generated!")
-
-        if manual_select:
-            st.session_state.manual_mode = True
-
-        # ----------------------------
-        # MANUAL SELECTION
-        # ----------------------------
-        if st.session_state.get("manual_mode", False):
-
-            st.subheader("Manual Question Selection")
-
-            manual_data = {}
-
-            for sheet in selected_sheets:
-                df = pd.read_excel(file_path, sheet_name=sheet).dropna()
-                qa_pairs = list(zip(df.iloc[:, 0].astype(str), df.iloc[:, 1].astype(str)))
-
-                options = [f"{q} || {a}" for q, a in qa_pairs]
-
-                selected = st.multiselect(f"{sheet}", options)
-
-                if selected:
-                    manual_data[sheet] = [
-                        tuple(item.split(" || ")) for item in selected
-                    ]
-
-            if st.button("Apply Manual Selection"):
-                st.session_state.generated = manual_data
-
-                qa_text = ""
-                ans_text = ""
-                qa_ans_text = ""
-
-                for sheet, items in manual_data.items():
-                    qa_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-                    ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-                    qa_ans_text += f"\n{sheet}\n" + "-" * 40 + "\n"
-
-                    for i, (q, a) in enumerate(items, 1):
-                        qa_text += f"{i}. {q}\n"
-                        ans_text += f"{i}. {a}\n"
-                        qa_ans_text += f"{i}. {q} ⮫ {a}\n"
-
-                st.session_state.qa_text = qa_text
-                st.session_state.ans_text = ans_text
-                st.session_state.qa_ans_text = qa_ans_text
-
-                st.success("Manual selection applied!")
-
-    # ----------------------------
-    # PREVIEW
-    # ----------------------------
-    st.subheader("Question Paper")
-#    st.text_area("Questions", st.session_state.qa_text, height=300)
+else:
 
     st.code(
         st.session_state.qa_text,
         language="text"
     )
-    
-    if st.session_state.generated:
 
-        st.success("Question Paper Ready")
+# =====================================================
+# ANSWER KEY
+# =====================================================
 
-        if st.button(
-            "📝 START TEST",
-            use_container_width=True
-        ):
-            st.session_state.page = "test"
-            st.rerun()
-    
-    
+if st.session_state.qa_text != "":
 
-    # ----------------------------
-    # ANSWER KEY TOGGLE
-    # ----------------------------
     show_answers = st.toggle(
         "👁 Show Answers",
         value=False
     )
 
     if show_answers:
-        st.subheader("Answer Key")
 
+        st.subheader("📘 Answer Key")
         st.code(
             st.session_state.qa_ans_text,
             language="text"
         )
-
-    # ----------------------------
-    # SAVE FOLDER
-    # ----------------------------
-    SAVE_FOLDER = "TEST_PAPERS"
-    os.makedirs(SAVE_FOLDER, exist_ok=True)
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-
-    # CREATE PDF FROM SESSION STATE
-    pdf_buffer_qa = create_pdf("QUESTION PAPER", st.session_state.qa_text)
-    pdf_buffer_ans = create_pdf("ANSWER SHEET", st.session_state.ans_text)
-    pdf_buffer_qa_ans = create_pdf("ANSWER SHEET", st.session_state.qa_ans_text)
-
-    st.download_button(
-        label="📤 Download Questions",
-        data=pdf_buffer_qa,
-        file_name="question_paper.pdf",
-        mime="application/pdf"
-    )
-  
-    
-    st.download_button(
-        label="📤 Download Questions & Answers",
-        data=pdf_buffer_qa_ans,
-        file_name="answer_paper.pdf",
-        mime="application/pdf"
-    )
-
-
-    # ====================================
-    # TEST PAGE
-    # ====================================
-    if st.session_state.page == "test":
-
-        st.title("📝 Practice Test")
-
-        q_no = 1
-
-        for sheet, questions in st.session_state.generated.items():
-
-            st.subheader(f"📚 {sheet}")
-
-            for idx, (question, answer) in enumerate(questions):
-
-                st.markdown(f"### Q{q_no}. {question}")
-
-                st.text_area(
-                    "Write your answer here",
-                    key=f"answer_{sheet}_{idx}",
-                    height=120
-                )
-
-                st.divider()
-
-                q_no += 1
-
-        st.write("---")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            if st.button(
-                "⬅ Back to Generator",
-                use_container_width=True
-            ):
-                st.session_state.page = "generator"
-                st.rerun()
-
-        with col2:
-            if st.button(
-                "✅ Submit Test",
-                use_container_width=True
-            ):
-                st.session_state.page = "result"
-                st.rerun()
-
-        st.stop()
-
-
-    # ====================================
-    # RESULT PAGE
-    # ====================================
-    if st.session_state.page == "result":
-
-        st.title("🏆 Test Result")
-
-        from difflib import SequenceMatcher
-
-        score = 0
-        total = 0
-
-        result_rows = []
-
-        for sheet, questions in st.session_state.generated.items():
-
-            for idx, (question, correct_answer) in enumerate(questions):
-
-                total += 1
-
-                student_answer = st.session_state.get(
-                    f"answer_{sheet}_{idx}",
-                    ""
-                )
-
-                similarity = SequenceMatcher(
-                    None,
-                    student_answer.lower().strip(),
-                    correct_answer.lower().strip()
-                ).ratio()
-
-                correct = similarity >= 0.70
-
-                if correct:
-                    score += 1
-
-                result_rows.append(
-                    {
-                        "Question": question,
-                        "Your Answer": student_answer,
-                        "Correct Answer": correct_answer,
-                        "Result": "✅ Correct" if correct else "❌ Wrong"
-                    }
-                )
-
-        percentage = 0
-
-        if total > 0:
-            percentage = round((score / total) * 100, 2)
-
-        st.metric(
-            "Score",
-            f"{score}/{total}"
-        )
-
-        st.metric(
-            "Percentage",
-            f"{percentage}%"
-        )
-
-        if percentage >= 80:
-            st.success("Excellent")
-        elif percentage >= 60:
-            st.info("Good")
-        else:
-            st.warning("Needs Improvement")
-
-        df = pd.DataFrame(result_rows)
-
-        st.dataframe(
-            df,
-            use_container_width=True
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            if st.button(
-                "🔄 Retake Test",
-                use_container_width=True
-            ):
-                st.session_state.page = "test"
-                st.rerun()
-
-        with col2:
-
-            if st.button(
-                "🏠 Home",
-                use_container_width=True
-            ):
-                st.session_state.page = "generator"
-
-                for k in list(st.session_state.keys()):
-                    if k.startswith("answer_"):
-                        del st.session_state[k]
-
-                st.rerun()
-
-        st.stop()
-
-
-
 
