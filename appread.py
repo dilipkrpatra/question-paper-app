@@ -1,6 +1,11 @@
 import os
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+import html
+
+
+
 
 # --------------------------------------------------
 # PAGE CONFIG
@@ -95,7 +100,7 @@ cells = []
 # Start from Excel Row 2
 for r in range(1, len(df)):
 
-    for c in range(2):      # A,B,C only
+    for c in range(2):      # A,B, only
 
         value = ""
 
@@ -108,30 +113,39 @@ for r in range(1, len(df)):
 
         address = f"{chr(65+c)}{r+1}"
 
-        #cells.append((address, value))
-        cells.append((address, value))
+        cells.append((address, value, c))
 
 # --------------------------------------------------
 # DISPLAY WINDOW
 # --------------------------------------------------
 
-st.markdown(
+# --------------------------------------------------
+# DISPLAY WINDOW
+# --------------------------------------------------
+
+components.html(
     f"""
-<div style="
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    border:1px solid #ccc;
-    padding:10px;
-    height:500px;
-    overflow-y:auto;
-    background:white;
-    color:black;
-    font-size:20px;
-">
-{st.session_state.display_text}
-</div>
-""",
-    unsafe_allow_html=True,
+    <div id="textbox"
+         style="
+            height:500px;
+            overflow-y:auto;
+            background:#f5f5f5;
+            padding:15px;
+            border:1px solid #cccccc;
+            border-radius:8px;
+            font-family:Arial;
+        ">
+
+        {st.session_state.display_text}
+
+    </div>
+
+    <script>
+        var box = document.getElementById("textbox");
+        box.scrollTop = box.scrollHeight;
+    </script>
+    """,
+    height=530,
 )
 
 # --------------------------------------------------
@@ -146,11 +160,49 @@ with col1:
 
         if st.session_state.visible_count < len(cells):
 
-            address, value = cells[
+            address, value, column = cells[
                 st.session_state.visible_count
             ]
 
-            st.session_state.display_text += f"{value.strip()}\n\n"
+            text = html.escape(value.strip())
+
+            if text:
+
+                if column == 0:
+                    html_text = f"""
+            <div style="
+                background:white;
+                border-left:6px solid #222;
+                padding:12px;
+                margin-bottom:8px;
+                border-radius:6px;
+                font-size:22px;
+                font-weight:bold;
+                color:#111;
+                box-shadow:0 1px 3px rgba(0,0,0,.15);
+            ">
+            {text}
+            </div>
+            """
+
+                else:
+                    html_text = f"""
+            <div style="
+                background:#eef7ff;
+                border-left:6px solid #1e88e5;
+                padding:10px 12px;
+                margin-left:35px;
+                margin-bottom:18px;
+                border-radius:6px;
+                font-size:20px;
+                color:#004a99;
+                box-shadow:0 1px 3px rgba(0,0,0,.10);
+            ">
+            {text}
+            </div>
+            """
+
+                st.session_state.display_text += html_text
 
             st.session_state.visible_count += 1
 
