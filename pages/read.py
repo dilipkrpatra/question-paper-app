@@ -130,7 +130,7 @@ def add_next_cell(cells):
 # SUBJECT SELECTION
 # =====================================================
 
-st.title("📄 Excel Cell Reader")
+st.title("📄 Learn Yourself")
 
 QUESTION_BANK_FOLDER = "question_bank"
 
