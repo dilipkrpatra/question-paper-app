@@ -1,10 +1,6 @@
 import streamlit as st
 
-st.set_page_config(
-    page_title="Study Suite",
-    page_icon="📚",
-    layout="wide"
-)
+st.set_page_config(page_title="Study Suite", page_icon="📚", layout="wide")
 
 st.title("📚 Study Suite Home")
 
@@ -26,10 +22,11 @@ with col2:
 
     if st.button("Open Generator", use_container_width=True):
         st.switch_page("pages/setqa.py")
-        
+
 with col3:
     st.markdown("## 📘 Test")
     st.markdown("Test random question papers from Question bank.")
 
     if st.button("Test Mode", use_container_width=True):
         st.switch_page("pages/test.py")
+
