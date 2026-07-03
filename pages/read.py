@@ -5,31 +5,22 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
-
 # --------------------------------------------------
 # PAGE CONFIG
 # --------------------------------------------------
 
-st.set_page_config(
-    page_title="Learn Yourself",
-    page_icon="📄",
-    layout="wide"
-)
+st.set_page_config(page_title="Learn Yourself", page_icon="📄", layout="wide")
 
 
 # --------------------------------------------------
 # LOAD WORKBOOK
 # --------------------------------------------------
 
+
 @st.cache_data(show_spinner=False)
 def load_workbook(file_path):
 
-    return pd.read_excel(
-        file_path,
-        sheet_name=None,
-        header=None,
-        engine="openpyxl"
-    )
+    return pd.read_excel(file_path, sheet_name=None, header=None, engine="openpyxl")
 
 
 # --------------------------------------------------
@@ -37,15 +28,11 @@ def load_workbook(file_path):
 # --------------------------------------------------
 
 defaults = {
-
     "display_text": "",
     "visible_count": 0,
-
     "started": False,
-
     "last_file": "",
-    "last_sheet": ""
-
+    "last_sheet": "",
 }
 
 for key, value in defaults.items():
@@ -58,6 +45,7 @@ for key, value in defaults.items():
 # --------------------------------------------------
 # HELPER : CREATE HTML CARD
 # --------------------------------------------------
+
 
 def create_card(text, column):
 
@@ -77,7 +65,7 @@ border-left:6px solid #222;
 padding:12px;
 margin-bottom:8px;
 border-radius:6px;
-font-size:22px;
+font-size:20px;
 font-weight:bold;
 color:#111;
 box-shadow:0 1px 3px rgba(0,0,0,.15);
@@ -109,14 +97,13 @@ box-shadow:0 1px 3px rgba(0,0,0,.10);
 # HELPER : ADD NEXT CELL
 # --------------------------------------------------
 
+
 def add_next_cell(cells):
 
     if st.session_state.visible_count >= len(cells):
         return
 
-    _, value, column = cells[
-        st.session_state.visible_count
-    ]
+    _, value, column = cells[st.session_state.visible_count]
 
     card = create_card(value, column)
 
@@ -125,7 +112,8 @@ def add_next_cell(cells):
         st.session_state.display_text += card
 
     st.session_state.visible_count += 1
-    
+
+
 # =====================================================
 # SUBJECT SELECTION
 # =====================================================
@@ -134,24 +122,17 @@ st.title("📄 Learn Yourself")
 
 QUESTION_BANK_FOLDER = "question_bank"
 
-files = sorted([
-    f for f in os.listdir(QUESTION_BANK_FOLDER)
-    if f.endswith((".xlsx", ".xls"))
-])
+files = sorted(
+    [f for f in os.listdir(QUESTION_BANK_FOLDER) if f.endswith((".xlsx", ".xls"))]
+)
 
 if not files:
     st.error("No Excel files found in 'question_bank' folder.")
     st.stop()
 
-selected_file = st.selectbox(
-    "📂 Select Subject",
-    files
-)
+selected_file = st.selectbox("📂 Select Subject", files)
 
-file_path = os.path.join(
-    QUESTION_BANK_FOLDER,
-    selected_file
-)
+file_path = os.path.join(QUESTION_BANK_FOLDER, selected_file)
 
 subject_name = os.path.splitext(selected_file)[0]
 
@@ -182,15 +163,11 @@ for sheet, df in workbook.items():
 
         total = df.iloc[1:, 0].notna().sum()
 
-    topic_display[
-        f"{sheet} ({total})"
-    ] = sheet
+    topic_display[f"{sheet} ({total})"] = sheet
 
 
 selected_display = st.pills(
-    "Choose Topic",
-    list(topic_display.keys()),
-    selection_mode="single"
+    "Choose Topic", list(topic_display.keys()), selection_mode="single"
 )
 
 if not selected_display:
@@ -203,13 +180,8 @@ sheet_name = topic_display[selected_display]
 # =====================================================
 
 if (
-
     st.session_state.last_file != selected_file
-
-    or
-
-    st.session_state.last_sheet != sheet_name
-
+    or st.session_state.last_sheet != sheet_name
 ):
 
     st.session_state.last_file = selected_file
@@ -229,8 +201,9 @@ df = workbook[sheet_name]
 cells = []
 
 # Skip heading row (Excel Row 1)
-
-for r in range(1, len(df)):
+# for r in range(1, len(df)):
+# Start reading from heading
+for r in range(0, len(df)):
 
     for c in range(2):
 
@@ -244,26 +217,15 @@ for r in range(1, len(df)):
 
                 value = str(cell).strip()
 
-        cells.append(
+        cells.append((f"{chr(65+c)}{r+1}", value, c))
 
-            (
-                f"{chr(65+c)}{r+1}",
-                value,
-                c
-            )
-
-        )
-        
 # =====================================================
 # START READING
 # =====================================================
 
 if not st.session_state.started:
 
-    if st.button(
-        "▶ Start Reading",
-        use_container_width=True
-    ):
+    if st.button("▶ Start Reading", use_container_width=True):
 
         st.session_state.started = True
 
@@ -280,7 +242,6 @@ if not st.session_state.started:
 if st.session_state.started:
 
     components.html(
-
         f"""
 <div id="textbox"
 style="
@@ -306,9 +267,7 @@ box.scrollTop=box.scrollHeight;
 </script>
 
 """,
-
         height=540,
-
     )
 
 
@@ -324,15 +283,9 @@ if st.session_state.started:
 
     with col1:
 
-        next_disabled = (
-            st.session_state.visible_count >= len(cells)
-        )
+        next_disabled = st.session_state.visible_count >= len(cells)
 
-        if st.button(
-            "Next ➜",
-            use_container_width=True,
-            disabled=next_disabled
-        ):
+        if st.button("Next ➜", use_container_width=True, disabled=next_disabled):
 
             add_next_cell(cells)
             st.rerun()
@@ -341,14 +294,10 @@ if st.session_state.started:
 
     with col2:
 
-        show_all_disabled = (
-            st.session_state.visible_count >= len(cells)
-        )
+        show_all_disabled = st.session_state.visible_count >= len(cells)
 
         if st.button(
-            "📖 Show All",
-            use_container_width=True,
-            disabled=show_all_disabled
+            "📖 Show All", use_container_width=True, disabled=show_all_disabled
         ):
 
             while st.session_state.visible_count < len(cells):
@@ -361,10 +310,7 @@ if st.session_state.started:
 
     with col3:
 
-        if st.button(
-            "Clear",
-            use_container_width=True
-        ):
+        if st.button("Clear", use_container_width=True):
 
             st.session_state.display_text = ""
             st.session_state.visible_count = 0
@@ -379,27 +325,16 @@ if st.session_state.started:
 
 if st.session_state.started:
 
-    st.progress(
-        st.session_state.visible_count / max(len(cells), 1)
-    )
+    st.progress(st.session_state.visible_count / max(len(cells), 1))
 
-    st.caption(
-        f"Items Read : {st.session_state.visible_count} / {len(cells)}"
-    )
+    st.caption(f"Items Read : {st.session_state.visible_count} / {len(cells)}")
 
 
 # =====================================================
 # FINISHED
 # =====================================================
 
-if (
-
-    st.session_state.started
-
-    and
-
-    st.session_state.visible_count >= len(cells)
-
-):
+if st.session_state.started and st.session_state.visible_count >= len(cells):
 
     st.success("✅ Finished reading all cells.")
+
