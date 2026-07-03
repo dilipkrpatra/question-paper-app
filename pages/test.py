@@ -9,17 +9,14 @@ import streamlit as st
 # PAGE CONFIG
 # --------------------------------------------------
 
-st.set_page_config(
-    page_title="Test Mode",
-    page_icon="📝",
-    layout="wide"
-)
+st.set_page_config(page_title="Test Mode", page_icon="📝", layout="wide")
 
 # --------------------------------------------------
 # CSS
 # --------------------------------------------------
 
-st.markdown("""
+st.markdown(
+    """
 <style>
 
 .main-title{
@@ -78,28 +75,22 @@ div.stButton > button:first-child:hover{
 }
 
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # --------------------------------------------------
 # SESSION STATE
 # --------------------------------------------------
 
 defaults = {
-
     "test_started": False,
-
     "submitted": False,
-
     "selected_questions": [],
-
     "start_time": None,
-
     "end_time": None,
-
     "score": 0,
-
-    "percentage": 0
-
+    "percentage": 0,
 }
 
 for key, value in defaults.items():
@@ -112,59 +103,36 @@ for key, value in defaults.items():
 # LOAD QUESTION BANK
 # --------------------------------------------------
 
+
 @st.cache_data(show_spinner=False)
 def load_question_bank(file_path):
 
-    workbook = pd.read_excel(
-        file_path,
-        sheet_name=None,
-        header=None,
-        engine="openpyxl"
-    )
+    workbook = pd.read_excel(file_path, sheet_name=None, header=None, engine="openpyxl")
 
     bank = {}
 
     for sheet, df in workbook.items():
 
-        heading = str(df.iloc[0,0])
+        heading = str(df.iloc[0, 0])
 
-        df = df.iloc[1:, [0,1]]
+        df = df.iloc[1:, [0, 1]]
 
-        df.columns = [
-            "question",
-            "answer"
-        ]
+        df.columns = ["question", "answer"]
 
-        df = df.dropna(
-            subset=["question","answer"]
-        )
+        df = df.dropna(subset=["question", "answer"])
 
-        questions = list(zip(
+        questions = list(zip(df["question"].astype(str), df["answer"].astype(str)))
 
-            df["question"].astype(str),
-
-            df["answer"].astype(str)
-
-        ))
-
-        bank[sheet] = {
-
-            "heading": heading,
-
-            "questions": questions
-
-        }
+        bank[sheet] = {"heading": heading, "questions": questions}
 
     return bank
+
 
 # --------------------------------------------------
 # TITLE
 # --------------------------------------------------
 
-st.markdown(
-    "<div class='main-title'>📝 Test Mode</div>",
-    unsafe_allow_html=True
-)
+st.markdown("<div class='main-title'>📝 Test Mode</div>", unsafe_allow_html=True)
 
 st.divider()
 
@@ -174,43 +142,21 @@ st.divider()
 
 QUESTION_BANK_FOLDER = "question_bank"
 
-files = sorted([
-
-    f for f in os.listdir(QUESTION_BANK_FOLDER)
-
-    if f.endswith((".xlsx",".xls"))
-
-])
+files = sorted(
+    [f for f in os.listdir(QUESTION_BANK_FOLDER) if f.endswith((".xlsx", ".xls"))]
+)
 
 if not files:
 
-    st.error(
-        "No Question Bank Found."
-    )
+    st.error("No Question Bank Found.")
 
     st.stop()
 
-selected_file = st.selectbox(
+selected_file = st.selectbox("📂 Select Subject", files)
 
-    "📂 Select Subject",
+subject_name = os.path.splitext(selected_file)[0]
 
-    files
-
-)
-
-subject_name = os.path.splitext(
-
-    selected_file
-
-)[0]
-
-file_path = os.path.join(
-
-    QUESTION_BANK_FOLDER,
-
-    selected_file
-
-)
+file_path = os.path.join(QUESTION_BANK_FOLDER, selected_file)
 
 # --------------------------------------------------
 # LOAD BANK
@@ -232,33 +178,15 @@ topic_display = {}
 
 for sheet in sheet_names:
 
-    total = len(
+    total = len(bank[sheet]["questions"])
 
-        bank[sheet]["questions"]
-
-    )
-
-    topic_display[
-        f"{sheet} ({total})"
-    ] = sheet
+    topic_display[f"{sheet} ({total})"] = sheet
 
 selected_display = st.pills(
-
-    "Choose Topics",
-
-    list(topic_display.keys()),
-
-    selection_mode="multi"
-
+    "Choose Topics", list(topic_display.keys()), selection_mode="multi"
 )
 
-selected_topics = [
-
-    topic_display[item]
-
-    for item in selected_display
-
-]
+selected_topics = [topic_display[item] for item in selected_display]
 
 # --------------------------------------------------
 # QUESTION COUNT
@@ -276,26 +204,15 @@ if selected_topics:
 
         with cols[index % 3]:
 
-            maximum = len(
-
-                bank[sheet]["questions"]
-
-            )
+            maximum = len(bank[sheet]["questions"])
 
             topic_counts[sheet] = st.number_input(
-
                 sheet,
-
                 min_value=1,
-
                 max_value=maximum,
-
                 value=min(5, maximum),
-
                 step=1,
-
-                key=f"count_{sheet}"
-
+                key=f"count_{sheet}",
             )
 
 # --------------------------------------------------
@@ -304,13 +221,7 @@ if selected_topics:
 
 if selected_topics:
 
-    start_test = st.button(
-
-        "▶ START TEST",
-
-        use_container_width=True
-
-    )
+    start_test = st.button("▶ START TEST", use_container_width=True)
 
 else:
 
@@ -328,39 +239,20 @@ if start_test:
 
         questions = bank[sheet]["questions"]
 
-        count = min(
+        count = min(topic_counts[sheet], len(questions))
 
-            topic_counts[sheet],
-
-            len(questions)
-
-        )
-
-        chosen = random.sample(
-
-            questions,
-
-            count
-
-        )
+        chosen = random.sample(questions, count)
 
         for q, a in chosen:
 
-            selected_questions.append({
-
-                "topic": sheet,
-
-                "question": q,
-
-                "answer": a
-
-            })
-
-    random.shuffle(
-
-        selected_questions
-
-    )
+            selected_questions.append(
+                {
+                    "topic": sheet,
+                    "heading": bank[sheet]["heading"],
+                    "question": q,
+                    "answer": a,
+                }
+            )
 
     st.session_state.selected_questions = selected_questions
 
@@ -371,29 +263,23 @@ if start_test:
     st.session_state.start_time = datetime.now()
 
     st.rerun()
-    
+
 # ==========================================================
 # TEST PAGE
 # ==========================================================
 
-if st.session_state.test_started:
+if st.session_state.test_started and not st.session_state.submitted:
 
     st.divider()
 
     st.header("📝 Test Paper")
 
-    total_questions = len(
-        st.session_state.selected_questions
-    )
+    total_questions = len(st.session_state.selected_questions)
 
-    st.info(
-        f"Subject : {subject_name}    |    "
-        f"Total Questions : {total_questions}"
-    )
+    st.info(f"Subject : {subject_name}    |    " f"Total Questions : {total_questions}")
 
     st.warning(
-        "Answer all the questions. "
-        "Click 'Submit Test' after completing the test."
+        "Answer all the questions. " "Click 'Submit Test' after completing the test."
     )
 
     st.write("")
@@ -402,32 +288,20 @@ if st.session_state.test_started:
     # DISPLAY ALL QUESTIONS
     # ------------------------------------------
 
-    for i, item in enumerate(
-        st.session_state.selected_questions,
-        start=1
-    ):
+    current_heading = ""
 
-        st.markdown(
-            f"""
-            <div class="question-box">
-            <h4>Question {i}</h4>
-            <b>{item["question"]}</b>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+    for i, item in enumerate(st.session_state.selected_questions, start=1):
 
-        st.text_area(
+        if item["heading"] != current_heading:
 
-            "Your Answer",
+            current_heading = item["heading"]
 
-            key=f"answer_{i}",
+            st.subheader(current_heading)
+            st.divider()
 
-            height=120,
+        st.write(f"**{i}. {item['question']}**")
 
-            placeholder="Type your answer here..."
-
-        )
+        st.text_input("Your Answer", key=f"answer_{i}")
 
     st.write("")
     st.divider()
@@ -436,17 +310,11 @@ if st.session_state.test_started:
     # SUBMIT BUTTON
     # ------------------------------------------
 
-    col1, col2, col3 = st.columns([1,2,1])
+    col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
 
-        if st.button(
-
-            "✅ Submit Test",
-
-            use_container_width=True
-
-        ):
+        if st.button("✅ Submit Test", use_container_width=True):
 
             st.session_state.confirm_submit = True
 
@@ -456,10 +324,7 @@ if st.session_state.test_started:
 # SUBMIT CONFIRMATION
 # ==========================================================
 
-if st.session_state.get(
-    "confirm_submit",
-    False
-):
+if st.session_state.get("confirm_submit", False):
 
     st.warning(
         "Are you sure you want to submit the test?\n\n"
@@ -470,10 +335,7 @@ if st.session_state.get(
 
     with c1:
 
-        if st.button(
-            "✔ Yes, Submit",
-            use_container_width=True
-        ):
+        if st.button("✔ Yes, Submit", use_container_width=True):
 
             st.session_state.end_time = datetime.now()
 
@@ -485,15 +347,12 @@ if st.session_state.get(
 
     with c2:
 
-        if st.button(
-            "❌ Continue Test",
-            use_container_width=True
-        ):
+        if st.button("❌ Continue Test", use_container_width=True):
 
             st.session_state.confirm_submit = False
 
             st.rerun()
-            
+
 # ==========================================================
 # AUTO EVALUATION
 # ==========================================================
@@ -522,67 +381,36 @@ if st.session_state.submitted:
     # MARKING
     # ------------------------------------------
 
-    total = len(
-        st.session_state.selected_questions
-    )
+    total = len(st.session_state.selected_questions)
 
     correct = 0
 
     results = []
 
-    for index, item in enumerate(
+    for index, item in enumerate(st.session_state.selected_questions, start=1):
 
-        st.session_state.selected_questions,
-
-        start=1
-
-    ):
-
-        student_answer = st.session_state.get(
-
-            f"answer_{index}",
-
-            ""
-
-        )
+        student_answer = st.session_state.get(f"answer_{index}", "")
 
         correct_answer = item["answer"]
 
-        is_correct = (
-
-            normalize(student_answer)
-
-            ==
-
-            normalize(correct_answer)
-
-        )
+        is_correct = normalize(student_answer) == normalize(correct_answer)
 
         if is_correct:
 
             correct += 1
 
-        results.append({
-
-            "question": item["question"],
-
-            "student": student_answer,
-
-            "correct": correct_answer,
-
-            "status": is_correct
-
-        })
+        results.append(
+            {
+                "question": item["question"],
+                "student": student_answer,
+                "correct": correct_answer,
+                "status": is_correct,
+            }
+        )
 
     wrong = total - correct
 
-    percentage = round(
-
-        correct * 100 / total,
-
-        2
-
-    )
+    percentage = round(correct * 100 / total, 2)
 
     st.session_state.score = correct
 
@@ -592,21 +420,9 @@ if st.session_state.submitted:
     # TIME TAKEN
     # ------------------------------------------
 
-    duration = (
+    duration = st.session_state.end_time - st.session_state.start_time
 
-        st.session_state.end_time
-
-        -
-
-        st.session_state.start_time
-
-    )
-
-    total_seconds = int(
-
-        duration.total_seconds()
-
-    )
+    total_seconds = int(duration.total_seconds())
 
     minutes = total_seconds // 60
 
@@ -618,43 +434,15 @@ if st.session_state.submitted:
 
     c1, c2, c3, c4 = st.columns(4)
 
-    c1.metric(
+    c1.metric("Total", total)
 
-        "Total",
+    c2.metric("Correct", correct)
 
-        total
+    c3.metric("Wrong", wrong)
 
-    )
+    c4.metric("Percentage", f"{percentage}%")
 
-    c2.metric(
-
-        "Correct",
-
-        correct
-
-    )
-
-    c3.metric(
-
-        "Wrong",
-
-        wrong
-
-    )
-
-    c4.metric(
-
-        "Percentage",
-
-        f"{percentage}%"
-
-    )
-
-    st.success(
-
-        f"⏱ Time Taken : {minutes} min {seconds} sec"
-
-    )
+    st.success(f"⏱ Time Taken : {minutes} min {seconds} sec")
 
     st.divider()
 
@@ -664,13 +452,7 @@ if st.session_state.submitted:
 
     st.subheader("📖 Answer Sheet")
 
-    for i, item in enumerate(
-
-        results,
-
-        start=1
-
-    ):
+    for i, item in enumerate(results, start=1):
 
         if item["status"]:
 
@@ -685,7 +467,6 @@ if st.session_state.submitted:
             symbol = "❌ Wrong"
 
         st.markdown(
-
             f"""
             <div class="{box}">
 
@@ -710,9 +491,7 @@ if st.session_state.submitted:
 
             </div>
             """,
-
-            unsafe_allow_html=True
-
+            unsafe_allow_html=True,
         )
 
     st.divider()
@@ -721,22 +500,13 @@ if st.session_state.submitted:
     # START NEW TEST
     # ------------------------------------------
 
-    if st.button(
+    if st.button("🔄 Start New Test", use_container_width=True):
 
-        "🔄 Start New Test",
-
-        use_container_width=True
-
-    ):
-
-        keys = list(
-
-            st.session_state.keys()
-
-        )
+        keys = list(st.session_state.keys())
 
         for key in keys:
 
             del st.session_state[key]
 
         st.rerun()
+
