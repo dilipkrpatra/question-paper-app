@@ -10,62 +10,35 @@ import streamlit.components.v1 as components
 
 from docx import Document
 
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer
-)
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 
-from reportlab.lib.styles import (
-    getSampleStyleSheet,
-    ParagraphStyle
-)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 from reportlab.lib.enums import TA_CENTER
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-
 # ---------------------------------------------------
 # PAGE CONFIG
 # ---------------------------------------------------
 
-st.set_page_config(
-    page_title="Question Paper Generator",
-    page_icon="📘",
-    layout="wide"
-)
+st.set_page_config(page_title="Question Paper Generator", page_icon="📘", layout="wide")
 
 # ---------------------------------------------------
 # FONTS
 # ---------------------------------------------------
 
-pdfmetrics.registerFont(
-    TTFont(
-        "Bengali",
-        "fonts/NotoSansBengali-Regular.ttf"
-    )
-)
+pdfmetrics.registerFont(TTFont("Bengali", "fonts/NotoSansBengali-Regular.ttf"))
 
-pdfmetrics.registerFont(
-    TTFont(
-        "Bengali2",
-        "fonts/solaimanlipi_22-02-2012.ttf"
-    )
-)
+pdfmetrics.registerFont(TTFont("Bengali2", "fonts/solaimanlipi_22-02-2012.ttf"))
 
 
 # ---------------------------------------------------
 # SESSION STATE
 # ---------------------------------------------------
 
-defaults = {
-    "generated": {},
-    "qa_text": "",
-    "ans_text": "",
-    "qa_ans_text": ""
-}
+defaults = {"generated": {}, "qa_text": "", "ans_text": "", "qa_ans_text": ""}
 
 for key, value in defaults.items():
     if key not in st.session_state:
@@ -76,15 +49,11 @@ for key, value in defaults.items():
 # CACHE WORKBOOK
 # ---------------------------------------------------
 
+
 @st.cache_data(show_spinner=False)
 def load_question_bank(file_path):
 
-    workbook = pd.read_excel(
-        file_path,
-        sheet_name=None,
-        header=None,
-        engine="openpyxl"
-    )
+    workbook = pd.read_excel(file_path, sheet_name=None, header=None, engine="openpyxl")
 
     bank = {}
 
@@ -101,21 +70,17 @@ def load_question_bank(file_path):
         # Drop rows where question or answer is missing ONLY in these 2 columns
         df = df.dropna(subset=["question", "answer"])
 
-        qa_pairs = list(zip(
-            df["question"].astype(str),
-            df["answer"].astype(str)
-        ))
+        qa_pairs = list(zip(df["question"].astype(str), df["answer"].astype(str)))
 
-        bank[sheet] = {
-            "heading": heading,
-            "questions": qa_pairs
-        }
+        bank[sheet] = {"heading": heading, "questions": qa_pairs}
 
     return bank
+
 
 # ---------------------------------------------------
 # PDF CREATOR
 # ---------------------------------------------------
+
 
 def create_pdf(title, text, subject):
 
@@ -128,59 +93,34 @@ def create_pdf(title, text, subject):
         parent=styles["Heading1"],
         alignment=TA_CENTER,
         fontSize=18,
-        spaceAfter=12
+        spaceAfter=12,
     )
 
     bengali_style = ParagraphStyle(
-        "Bengali",
-        parent=styles["Normal"],
-        fontName="Bengali2",
-        fontSize=11,
-        leading=16
+        "Bengali", parent=styles["Normal"], fontName="Bengali2", fontSize=11, leading=16
     )
 
     story = []
 
-    story.append(
-        Paragraph(title, header_style)
-    )
+    story.append(Paragraph(title, header_style))
+
+    story.append(Paragraph(f"Subject : {subject}", styles["Normal"]))
 
     story.append(
-        Paragraph(
-            f"Subject : {subject}",
-            styles["Normal"]
-        )
+        Paragraph(f"Date : {datetime.now().strftime('%d-%m-%Y')}", styles["Normal"])
     )
 
-    story.append(
-        Paragraph(
-            f"Date : {datetime.now().strftime('%d-%m-%Y')}",
-            styles["Normal"]
-        )
-    )
-
-    story.append(
-        Spacer(1, 12)
-    )
+    story.append(Spacer(1, 12))
 
     for line in text.split("\n"):
 
         if line.strip():
-            story.append(
-                Paragraph(
-                    line,
-                    bengali_style
-                )
-            )
+            story.append(Paragraph(line, bengali_style))
 
-            story.append(
-                Spacer(1, 5)
-            )
+            story.append(Spacer(1, 5))
 
         else:
-            story.append(
-                Spacer(1, 10)
-            )
+            story.append(Spacer(1, 10))
 
     doc.build(story)
     buffer.seek(0)
@@ -191,6 +131,7 @@ def create_pdf(title, text, subject):
 # ---------------------------------------------------
 # DOCX CREATOR
 # ---------------------------------------------------
+
 
 def create_docx(title, text):
 
@@ -214,6 +155,7 @@ def create_docx(title, text):
 # BUILD QUESTION TEXT
 # ---------------------------------------------------
 
+
 def build_text(selected_questions, bank):
 
     qa_text = ""
@@ -232,16 +174,14 @@ def build_text(selected_questions, bank):
         qa_ans_text += f"\n{heading}\n"
         qa_ans_text += "-" * 40 + "\n"
 
-        for i, (q, a) in enumerate(
-            questions,
-            1
-        ):
+        for i, (q, a) in enumerate(questions, 1):
 
             qa_text += f"{i}. {q}\n"
             ans_text += f"{i}. {a}\n"
             qa_ans_text += f"{i}. {q}  ⮫  {a}\n"
 
     return qa_text, ans_text, qa_ans_text
+
 
 # =====================================================
 # MAIN TITLE
@@ -256,24 +196,17 @@ st.title("📘 Test Paper Generator")
 
 QUESTION_BANK_FOLDER = "question_bank"
 
-files = sorted([
-    f for f in os.listdir(QUESTION_BANK_FOLDER)
-    if f.endswith((".xlsx", ".xls"))
-])
+files = sorted(
+    [f for f in os.listdir(QUESTION_BANK_FOLDER) if f.endswith((".xlsx", ".xls"))]
+)
 
 if not files:
     st.error("No Excel files found in 'question_bank' folder.")
     st.stop()
 
-selected_file = st.selectbox(
-    "📂 Select Subject",
-    files
-)
+selected_file = st.selectbox("📂 Select Subject", files)
 
-file_path = os.path.join(
-    QUESTION_BANK_FOLDER,
-    selected_file
-)
+file_path = os.path.join(QUESTION_BANK_FOLDER, selected_file)
 
 subject_name = os.path.splitext(selected_file)[0]
 
@@ -302,21 +235,14 @@ for sheet in sheet_names:
 
     total = len(bank[sheet]["questions"])
 
-    topic_display[
-        f"{sheet} ({total})"
-    ] = sheet
+    topic_display[f"{sheet} ({total})"] = sheet
 
 
 selected_display = st.pills(
-    "Choose Topics",
-    list(topic_display.keys()),
-    selection_mode="multi"
+    "Choose Topics", list(topic_display.keys()), selection_mode="multi"
 )
 
-selected_topics = [
-    topic_display[item]
-    for item in selected_display
-]
+selected_topics = [topic_display[item] for item in selected_display]
 
 
 # =====================================================
@@ -338,13 +264,12 @@ if selected_topics:
             maximum = len(bank[sheet]["questions"])
 
             topic_counts[sheet] = st.number_input(
-
                 sheet,
                 min_value=1,
                 max_value=maximum,
                 value=min(5, maximum),
                 step=1,
-                key=f"count_{sheet}"
+                key=f"count_{sheet}",
             )
 
 
@@ -352,7 +277,8 @@ if selected_topics:
 # BUTTON CSS
 # =====================================================
 
-st.markdown("""
+st.markdown(
+    """
 
 <style>
 
@@ -376,7 +302,9 @@ div.stButton > button:first-child:hover{
 
 </style>
 
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 
 # =====================================================
@@ -385,10 +313,7 @@ div.stButton > button:first-child:hover{
 
 if selected_topics:
 
-    generate = st.button(
-        "⚡ GENERATE QUESTION PAPER",
-        use_container_width=True
-    )
+    generate = st.button("⚡ GENERATE QUESTION PAPER", use_container_width=True)
 
 else:
     generate = False
@@ -402,30 +327,20 @@ if generate:
     generated = {}
     for sheet in selected_topics:
         questions = bank[sheet]["questions"]
-        count = min(
+        count = min(topic_counts[sheet], len(questions))
 
-            topic_counts[sheet],
-            len(questions)
-        )
-
-        generated[sheet] = random.sample(
-            questions,
-            count
-        )
+        generated[sheet] = random.sample(questions, count)
 
     st.session_state.generated = generated
 
-    qa_text, ans_text, qa_ans_text = build_text(
-        generated,
-        bank
-    )
+    qa_text, ans_text, qa_ans_text = build_text(generated, bank)
 
     st.session_state.qa_text = qa_text
     st.session_state.ans_text = ans_text
     st.session_state.qa_ans_text = qa_ans_text
 
     st.success("✅ Question Paper Generated Successfully")
-    
+
 # =====================================================
 # PREVIEW
 # =====================================================
@@ -440,10 +355,7 @@ if st.session_state.qa_text == "":
 
 else:
 
-    st.code(
-        st.session_state.qa_text,
-        language="text"
-    )
+    st.code(st.session_state.qa_text, language="text")
 
 # =====================================================
 # ANSWER KEY
@@ -451,15 +363,10 @@ else:
 
 if st.session_state.qa_text != "":
 
-    show_answers = st.toggle(
-        "👁 Show Answers",
-        value=False
-    )
+    show_answers = st.toggle("👁 Show Answers", value=False)
 
     if show_answers:
 
         st.subheader("📘 Answer Key")
-        st.code(
-            st.session_state.qa_ans_text,
-            language="text"
-        )
+        st.code(st.session_state.qa_ans_text, language="text")
+
