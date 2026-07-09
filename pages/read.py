@@ -61,11 +61,11 @@ def create_card(text, column):
         return f"""
 <div style="
 background:white;
-border-left:6px solid #222;
-padding:12px;
-margin-bottom:8px;
-border-radius:6px;
-font-size:20px;
+border-left:4px solid #222;
+padding:10px;
+margin-bottom:4px;
+border-radius:4px;
+font-size:16px;
 font-weight:bold;
 color:#111;
 box-shadow:0 1px 3px rgba(0,0,0,.15);
@@ -79,12 +79,12 @@ box-shadow:0 1px 3px rgba(0,0,0,.15);
     return f"""
 <div style="
 background:#eef7ff;
-border-left:6px solid #1e88e5;
-padding:10px 12px;
+border-left:4px solid #1e88e5;
+padding:8px 10px;
 margin-left:35px;
-margin-bottom:18px;
-border-radius:6px;
-font-size:20px;
+margin-bottom:10px;
+border-radius:4px;
+font-size:16px;
 color:#004a99;
 box-shadow:0 1px 3px rgba(0,0,0,.10);
 ">
