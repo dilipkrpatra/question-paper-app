@@ -85,6 +85,7 @@ margin-left:35px;
 margin-bottom:10px;
 border-radius:4px;
 font-size:16px;
+font-weight:bold;
 color:#004a99;
 box-shadow:0 1px 3px rgba(0,0,0,.10);
 ">
