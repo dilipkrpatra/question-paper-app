@@ -177,6 +177,57 @@ if not selected_display:
 sheet_name = topic_display[selected_display]
 
 # =====================================================
+# SEARCH
+# =====================================================
+
+search_text = st.text_input(
+    "🔍 Search Question / Answer",
+    placeholder="Type a word..."
+)
+
+if search_text.strip():
+
+    keyword = search_text.lower()
+    found = False
+
+    st.subheader("Search Results")
+
+    for r in range(len(df)):
+
+        # Read Question
+        question = ""
+        if df.shape[1] > 0:
+            cell = df.iat[r, 0]
+            if pd.notna(cell):
+                question = str(cell).strip()
+
+        # Read Answer
+        answer = ""
+        if df.shape[1] > 1:
+            cell = df.iat[r, 1]
+            if pd.notna(cell):
+                answer = str(cell).strip()
+
+        # Skip empty rows
+        if question == "" and answer == "":
+            continue
+
+        # Search in either column
+        if keyword in question.lower() or keyword in answer.lower():
+
+            # Show Question
+            st.markdown(create_card(question, 0), unsafe_allow_html=True)
+
+            # Show Answer
+            st.markdown(create_card(answer, 1), unsafe_allow_html=True)
+
+            found = True
+
+    if not found:
+        st.warning("No matching text found.")
+
+
+# =====================================================
 # RESET IF SUBJECT / TOPIC CHANGES
 # =====================================================
 
@@ -198,6 +249,7 @@ if (
 # =====================================================
 
 df = workbook[sheet_name]
+st.write(df.head(10))
 
 cells = []
 
@@ -219,6 +271,36 @@ for r in range(0, len(df)):
                 value = str(cell).strip()
 
         cells.append((f"{chr(65+c)}{r+1}", value, c))
+
+search_results = []
+
+if search_text.strip():
+
+    keyword = search_text.lower()
+
+    for cell_id, value, column in cells:
+
+        if keyword in value.lower():
+
+            search_results.append((cell_id, value, column))
+
+if search_text.strip():
+
+    st.subheader("Search Results")
+
+    if search_results:
+
+        for cell_id, value, column in search_results:
+
+            st.markdown(
+                create_card(value, column),
+                unsafe_allow_html=True,
+            )
+
+    else:
+
+        st.warning("No matching text found.")
+
 
 # =====================================================
 # START READING
