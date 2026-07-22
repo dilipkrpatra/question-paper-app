@@ -249,7 +249,7 @@ if (
 # =====================================================
 
 df = workbook[sheet_name]
-st.write(df.head(10))
+st.write(df)
 
 cells = []
 
